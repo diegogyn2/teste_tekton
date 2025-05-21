@@ -1,4 +1,5 @@
 image: python:3.10
 language: python
-run: |
-  teste.py
+run:
+  - teste.py
+  - make print-teste
