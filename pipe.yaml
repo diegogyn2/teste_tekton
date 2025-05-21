@@ -1,5 +1,25 @@
-image: python:3.10
-language: python
-run:
-  - teste.py
-  - make print-teste
+steps:
+  - name: validate
+    image: python:3.11.7-bookworm
+    environment:
+      PRD_TESTE: "PRD"
+      LOCAL_TESTE: "REPO"
+    commands:
+      - make print-teste
+      - echo $PRD_TESTE
+
+  - name: build
+    image: python:3.11.7-bookworm
+    runAfter:
+      - validate
+    commands:
+      - echo "Rodando build"
+      - make print-teste
+
+  - name: deploy
+    image: python:3.11.7-bookworm
+    runAfter:
+      - build
+    commands:
+      - echo "Deploy para prod"
+      - make print-teste
