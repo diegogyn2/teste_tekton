@@ -1,4 +1,4 @@
 image: python:3.10
 language: python
 run: |
-  print("Rodando script Python dinâmico!")
+  teste.py
