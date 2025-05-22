@@ -37,12 +37,12 @@ def main():
         exit(1)
 
     # Lista para armazenar os nomes das Tasks geradas para o Pipeline
-    generated_pipeline_tasks_info = [] # Armazena nome e runAfter para o Pipeline
+    generated_pipeline_tasks_info = []
 
     # 1. Geração e Aplicação das Tasks Tekton separadas
     print(f"Gerando e aplicando Tasks separadas em '{GENERATED_TASKS_DIR}'...")
     for step_config in config['steps']:
-        task_tekton_name = normalize_name(step_config['name']) # Nome da Task Tekton
+        task_tekton_name = normalize_name(step_config['name'])
         generated_pipeline_tasks_info.append({'name': task_tekton_name, 'runAfter': step_config.get('runAfter')})
 
         # Define a estrutura da Task Tekton
@@ -51,7 +51,17 @@ def main():
             'kind': 'Task',
             'metadata': {'name': task_tekton_name, 'namespace': NAMESPACE},
             'spec': {
-                'workspaces': [{'name': 'shared-workspace'}], # Declara o workspace necessário para a Task
+                'workspaces': [{'name': 'shared-workspace'}], # Continua declarando o workspace
+                # --- INÍCIO DO WORKAROUND: Força a definição do volume na Task ---
+                'volumes': [
+                    {
+                        'name': 'shared-workspace', # O nome do volume deve ser igual ao nome do workspace
+                        'persistentVolumeClaim': {
+                            'claimName': 'shared-workspace-pvc' # Referencia o PVC diretamente aqui
+                        }
+                    }
+                ],
+                # --- FIM DO WORKAROUND ---
                 'steps': []
             }
         }
@@ -60,7 +70,6 @@ def main():
         for command in step_config['commands']:
             step_name = normalize_name(command)
             
-            # Adiciona a instalação do 'make' ao script (apt-get para imagens baseadas em Debian/Bookworm)
             script_content = f"#!/bin/sh\n" \
                              f"apt-get update && apt-get install -y make || echo 'make already installed or could not install'\n" \
                              f"{command}"
@@ -71,7 +80,7 @@ def main():
                 'script': script_content,
                 'volumeMounts': [
                     {
-                        'name': 'shared-workspace',
+                        'name': 'shared-workspace', # Continua referenciando o nome do volume
                         'mountPath': '/workspace'
                     }
                 ],
@@ -84,13 +93,11 @@ def main():
 
             task_tekton['spec']['steps'].append(step_spec)
         
-        # Salva a Task gerada em um arquivo
         task_output_path = os.path.join(GENERATED_TASKS_DIR, f"{task_tekton_name}-task.yaml")
         with open(task_output_path, 'w') as f:
             yaml.dump(task_tekton, f, sort_keys=False)
         print(f"Task '{task_tekton_name}' gerada em '{task_output_path}'")
 
-        # Aplica a Task no cluster
         try:
             subprocess.run(['kubectl', 'apply', '-f', task_output_path], check=True)
             print(f"Task '{task_tekton_name}' aplicada com sucesso.")
@@ -105,22 +112,21 @@ def main():
         'kind': 'Pipeline',
         'metadata': {'name': PIPELINE_NAME, 'namespace': NAMESPACE},
         'spec': {
-            'workspaces': [{'name': 'shared-workspace'}], # O Pipeline precisa de um workspace
+            'workspaces': [{'name': 'shared-workspace'}],
             'tasks': []
         }
     }
 
-    # Adiciona as Tasks geradas ao Pipeline usando taskRef
     for task_info in generated_pipeline_tasks_info:
         pipeline_task = {
             'name': task_info['name'],
             'taskRef': {
-                'name': task_info['name'] # Referencia a Task pelo nome gerado
+                'name': task_info['name']
             },
             'workspaces': [
                 {
-                    'name': 'shared-workspace', # O nome do workspace na Task (que é 'shared-workspace')
-                    'workspace': 'shared-workspace' # O nome do workspace no Pipeline (que é 'shared-workspace')
+                    'name': 'shared-workspace',
+                    'workspace': 'shared-workspace'
                 }
             ]
         }
@@ -129,12 +135,10 @@ def main():
             
         pipeline['spec']['tasks'].append(pipeline_task)
 
-    # Salva o Pipeline gerado em um arquivo YAML
     with open(OUTPUT_PIPELINE, 'w') as f:
         yaml.dump(pipeline, f, sort_keys=False)
     print(f"Pipeline '{PIPELINE_NAME}' gerado em '{OUTPUT_PIPELINE}'")
 
-    # Aplica o Pipeline no cluster Kubernetes
     try:
         subprocess.run(['kubectl', 'apply', '-f', OUTPUT_PIPELINE], check=True)
         print(f"Pipeline '{PIPELINE_NAME}' aplicado com sucesso no cluster.")
@@ -167,12 +171,10 @@ def main():
         }
     }
 
-    # Salva o PipelineRun gerado em um arquivo YAML
     with open(OUTPUT_PIPELINERUN, 'w') as f:
         yaml.dump(pipelinerun, f, sort_keys=False)
     print(f"PipelineRun '{PIPELINERUN_NAME}' gerado em '{OUTPUT_PIPELINERUN}'")
 
-    # Aplica o PipelineRun para disparar a execução da pipeline gerada
     try:
         subprocess.run(['kubectl', 'apply', '-f', OUTPUT_PIPELINERUN], check=True)
         print(f"PipelineRun '{PIPELINERUN_NAME}' aplicado com sucesso no cluster, disparando a execução.")
