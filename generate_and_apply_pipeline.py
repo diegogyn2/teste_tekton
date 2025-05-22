@@ -36,9 +36,9 @@ def main():
     pipeline = {
         'apiVersion': 'tekton.dev/v1',
         'kind': 'Pipeline',
-        'metadata': {'name': PIPELINE_NAME, 'namespace': NAMESPACE}, # Adicionado namespace para clareza
+        'metadata': {'name': PIPELINE_NAME, 'namespace': NAMESPACE},
         'spec': {
-            'workspaces': [{'name': 'shared-workspace'}], # Declara o workspace necessário para o Pipeline
+            'workspaces': [{'name': 'shared-workspace'}],
             'tasks': []
         }
     }
@@ -49,8 +49,8 @@ def main():
         task = {
             'name': step_config['name'],
             'taskSpec': {
-                'workspaces': [{'name': 'shared-workspace'}], # Declara o workspace necessário para a Task
-                'steps': [] # Lista de steps (comandos) dentro desta Task
+                'workspaces': [{'name': 'shared-workspace'}],
+                'steps': []
             }
         }
         # Adiciona a dependência 'runAfter' se especificada no ci-config.yaml
@@ -60,21 +60,28 @@ def main():
         # Itera sobre os comandos dentro de cada passo para criar os Steps das Tasks
         for command in step_config['commands']:
             step_name = normalize_step_name(command)
+            
+            # --- INÍCIO DA CORREÇÃO para instalar 'make' e garantir o workspace ---
+            # Adiciona a instalação do 'make' ao script, caso ele seja usado.
+            # Se a imagem base não tiver 'make', ele será instalado.
+            # Esta lógica garante que o ambiente está pronto para o comando.
+            script_content = f"#!/bin/sh\n" \
+                             f"apt-get update && apt-get install -y make || echo 'make already installed or could not install'\n" \
+                             f"{command}" # O comando original do ci-config.yaml
+
             step_spec = {
                 'name': step_name,
                 'image': step_config['image'],
-                'script': f"#!/bin/sh\n{command}", # O comando a ser executado
-                # --- INÍCIO DA CORREÇÃO IMPORTANTE ---
-                # Garante que o workspace seja montado dentro do pod de cada step
+                'script': script_content,
                 'volumeMounts': [
                     {
-                        'name': 'shared-workspace', # Nome do workspace declarado na Task
-                        'mountPath': '/workspace'   # Caminho onde o workspace será montado no contêiner do step
+                        'name': 'shared-workspace',
+                        'mountPath': '/workspace'
                     }
                 ],
                 'workingDir': '/workspace' # Define o diretório de trabalho para o caminho do workspace montado
-                # --- FIM DA CORREÇÃO IMPORTANTE ---
             }
+            # --- FIM DA CORREÇÃO ---
 
             # Adiciona variáveis de ambiente, se houver, para o step
             if 'environment' in step_config:
@@ -97,13 +104,12 @@ def main():
         print(f"Pipeline '{PIPELINE_NAME}' aplicado com sucesso no cluster.")
     except subprocess.CalledProcessError as e:
         print(f"Erro ao aplicar o Pipeline '{PIPELINE_NAME}': {e}")
-        # A saída de erro (stderr) geralmente contém a mensagem útil do kubectl
         print(f"Detalhes do erro: {e.stderr.decode()}")
         exit(1)
 
     # --- 2. Geração do Objeto PipelineRun (generated_pipelinerun.yaml) ---
     pipelinerun = {
-        'apiVersion': 'tekton.dev/v1', # Versão correta para PipelineRun
+        'apiVersion': 'tekton.dev/v1',
         'kind': 'PipelineRun',
         'metadata': {
             'name': PIPELINERUN_NAME,
@@ -115,11 +121,10 @@ def main():
                 {
                     'name': 'shared-workspace',
                     'persistentVolumeClaim': {
-                        'claimName': 'shared-workspace-pvc' # PVC que será usado pelo workspace
+                        'claimName': 'shared-workspace-pvc'
                     }
                 }
             ],
-            # Configuração do ServiceAccount para as TaskRuns geradas por este PipelineRun
             'taskRunTemplate': {
                 'serviceAccountName': 'trustme-tekton-triggers-sa'
             }
