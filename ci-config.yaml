@@ -5,8 +5,9 @@ steps:
       PRD_TESTE: "PRD"
       LOCAL_TESTE: "REPO"
     commands:
-      - make print-teste
       - ls -l $(workspaces.shared-workspace.path)
+      - cat $(workspaces.shared-workspace.path)/Makefile
+      - make print-teste
       - echo $PRD_TESTE
 
   - name: build
