@@ -83,11 +83,11 @@ apt-get update && apt-get install -y make || echo 'make already installed or cou
         print(f"Task '{task_tekton_name}' gerada em '{task_output_path}'")
 
         try:
-            subprocess.run(['kubectl', 'apply', '-f', task_output_path], check=True)
+            subprocess.run(['kubectl', 'apply', '-f', task_output_path], check=True, capture_output=True)
             print(f"Task '{task_tekton_name}' aplicada com sucesso.")
         except subprocess.CalledProcessError as e:
             print(f"Erro ao aplicar a Task '{task_tekton_name}': {e}")
-            print(f"Detalhes do erro: {e.stderr.decode()}")
+            print(f"Detalhes do erro: {e.stderr.decode() if e.stderr else 'Nenhuma saída de erro capturada.'}")
             exit(1)
 
     # 2. Geração do Objeto Pipeline (generated_pipeline.yaml)
@@ -122,11 +122,11 @@ apt-get update && apt-get install -y make || echo 'make already installed or cou
     print(f"Pipeline '{PIPELINE_NAME}' gerado em '{OUTPUT_PIPELINE}'")
 
     try:
-        subprocess.run(['kubectl', 'apply', '-f', OUTPUT_PIPELINE], check=True)
+        subprocess.run(['kubectl', 'apply', '-f', OUTPUT_PIPELINE], check=True, capture_output=True)
         print(f"Pipeline '{PIPELINE_NAME}' aplicado com sucesso no cluster.")
     except subprocess.CalledProcessError as e:
         print(f"Erro ao aplicar o Pipeline '{PIPELINE_NAME}': {e}")
-        print(f"Detalhes do erro: {e.stderr.decode()}")
+        print(f"Detalhes do erro: {e.stderr.decode() if e.stderr else 'Nenhuma saída de erro capturada.'}")
         exit(1)
 
     # 3. Geração do Objeto PipelineRun (generated_pipelinerun.yaml)
@@ -158,11 +158,11 @@ apt-get update && apt-get install -y make || echo 'make already installed or cou
     print(f"PipelineRun '{PIPELINERUN_NAME}' gerado em '{OUTPUT_PIPELINERUN}'")
 
     try:
-        subprocess.run(['kubectl', 'apply', '-f', OUTPUT_PIPELINERUN], check=True)
+        subprocess.run(['kubectl', 'apply', '-f', OUTPUT_PIPELINERUN], check=True, capture_output=True)
         print(f"PipelineRun '{PIPELINERUN_NAME}' aplicado com sucesso no cluster, disparando a execução.")
     except subprocess.CalledProcessError as e:
         print(f"Erro ao aplicar o PipelineRun '{PIPELINERUN_NAME}': {e}")
-        print(f"Detalhes do erro: {e.stderr.decode()}")
+        print(f"Detalhes do erro: {e.stderr.decode() if e.stderr else 'Nenhuma saída de erro capturada.'}")
         exit(1)
 
 if __name__ == '__main__':
