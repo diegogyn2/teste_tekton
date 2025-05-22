@@ -1,6 +1,7 @@
 import yaml
 import subprocess
 import re
+import os
 
 # Constantes para os nomes dos arquivos e recursos Tekton
 CI_CONFIG_PATH = 'ci-config.yaml'
@@ -8,22 +9,25 @@ OUTPUT_PIPELINE = 'generated_pipeline.yaml'
 OUTPUT_PIPELINERUN = 'generated_pipelinerun.yaml'
 PIPELINE_NAME = 'auto-generated-pipeline'
 PIPELINERUN_NAME = 'auto-generated-pipeline-run'
-NAMESPACE = 'ci-cd-trustme' # Certifique-se de que este namespace existe no seu cluster
+NAMESPACE = 'ci-cd-trustme'
 
-def normalize_step_name(command):
+# Diretório temporário para salvar as Tasks geradas
+GENERATED_TASKS_DIR = 'generated-tasks'
+
+def normalize_name(s):
     """
-    Normaliza o nome de um comando para ser um nome de step válido para o Kubernetes/Tekton.
-    Remove caracteres especiais, substitui espaços por hífens e limita o tamanho.
+    Normaliza uma string para ser um nome de recurso Kubernetes/Tekton válido.
     """
-    name = command.lower()
-    name = re.sub(r'[^a-z0-9-]+', '-', name) # Mantém apenas letras minúsculas, números e hífens
-    name = re.sub(r'-+', '-', name)         # Consolida múltiplos hífens
-    name = name.strip('-')                  # Remove hífens do início e fim
-    return name[:63] # Limita o nome a 63 caracteres (padrão Kubernetes)
+    name = s.lower()
+    name = re.sub(r'[^a-z0-9-]+', '-', name)
+    name = re.sub(r'-+', '-', name)
+    name = name.strip('-')
+    return name[:63]
 
 def main():
-    # Carrega o arquivo de configuração de CI (ci-config.yaml)
-    # Este arquivo DEVE estar no diretório 'repo' clonado pelo meta-pipeline.
+    # Garante que o diretório para tasks geradas exista
+    os.makedirs(GENERATED_TASKS_DIR, exist_ok=True)
+
     try:
         with open(CI_CONFIG_PATH) as f:
             config = yaml.safe_load(f)
@@ -32,43 +36,35 @@ def main():
               "Certifique-se de que ele existe no diretório do repositório clonado pelo meta-pipeline.")
         exit(1)
 
-    # --- 1. Geração do Objeto Pipeline (generated_pipeline.yaml) ---
-    pipeline = {
-        'apiVersion': 'tekton.dev/v1',
-        'kind': 'Pipeline',
-        'metadata': {'name': PIPELINE_NAME, 'namespace': NAMESPACE},
-        'spec': {
-            'workspaces': [{'name': 'shared-workspace'}],
-            'tasks': []
-        }
-    }
+    # Lista para armazenar os nomes das Tasks geradas para o Pipeline
+    generated_pipeline_tasks_info = [] # Armazena nome e runAfter para o Pipeline
 
-    # Itera sobre os passos definidos no ci-config.yaml para criar as Tasks do Pipeline
+    # 1. Geração e Aplicação das Tasks Tekton separadas
+    print(f"Gerando e aplicando Tasks separadas em '{GENERATED_TASKS_DIR}'...")
     for step_config in config['steps']:
-        # Cada "step" no ci-config.yaml se torna uma Task independente no Tekton Pipeline
-        task = {
-            'name': step_config['name'],
-            'taskSpec': {
-                'workspaces': [{'name': 'shared-workspace'}],
+        task_tekton_name = normalize_name(step_config['name']) # Nome da Task Tekton
+        generated_pipeline_tasks_info.append({'name': task_tekton_name, 'runAfter': step_config.get('runAfter')})
+
+        # Define a estrutura da Task Tekton
+        task_tekton = {
+            'apiVersion': 'tekton.dev/v1',
+            'kind': 'Task',
+            'metadata': {'name': task_tekton_name, 'namespace': NAMESPACE},
+            'spec': {
+                'workspaces': [{'name': 'shared-workspace'}], # Declara o workspace necessário para a Task
                 'steps': []
             }
         }
-        # Adiciona a dependência 'runAfter' se especificada no ci-config.yaml
-        if 'runAfter' in step_config:
-            task['runAfter'] = step_config['runAfter']
 
-        # Itera sobre os comandos dentro de cada passo para criar os Steps das Tasks
+        # Itera sobre os comandos dentro de cada passo para criar os Steps da Task
         for command in step_config['commands']:
-            step_name = normalize_step_name(command)
+            step_name = normalize_name(command)
             
-            # --- INÍCIO DA CORREÇÃO para instalar 'make' e garantir o workspace ---
-            # Adiciona a instalação do 'make' ao script, caso ele seja usado.
-            # Se a imagem base não tiver 'make', ele será instalado.
-            # Esta lógica garante que o ambiente está pronto para o comando.
+            # Adiciona a instalação do 'make' ao script (apt-get para imagens baseadas em Debian/Bookworm)
             script_content = f"#!/bin/sh\n" \
                              f"apt-get update && apt-get install -y make || echo 'make already installed or could not install'\n" \
-                             f"{command}" # O comando original do ci-config.yaml
-
+                             f"{command}"
+            
             step_spec = {
                 'name': step_name,
                 'image': step_config['image'],
@@ -79,23 +75,63 @@ def main():
                         'mountPath': '/workspace'
                     }
                 ],
-                'workingDir': '/workspace' # Define o diretório de trabalho para o caminho do workspace montado
+                'workingDir': '/workspace'
             }
-            # --- FIM DA CORREÇÃO ---
 
-            # Adiciona variáveis de ambiente, se houver, para o step
             if 'environment' in step_config:
                 env_vars = [{'name': k, 'value': v} for k, v in step_config['environment'].items()]
                 step_spec['env'] = env_vars
 
-            task['taskSpec']['steps'].append(step_spec)
+            task_tekton['spec']['steps'].append(step_spec)
+        
+        # Salva a Task gerada em um arquivo
+        task_output_path = os.path.join(GENERATED_TASKS_DIR, f"{task_tekton_name}-task.yaml")
+        with open(task_output_path, 'w') as f:
+            yaml.dump(task_tekton, f, sort_keys=False)
+        print(f"Task '{task_tekton_name}' gerada em '{task_output_path}'")
 
-        pipeline['spec']['tasks'].append(task)
+        # Aplica a Task no cluster
+        try:
+            subprocess.run(['kubectl', 'apply', '-f', task_output_path], check=True)
+            print(f"Task '{task_tekton_name}' aplicada com sucesso.")
+        except subprocess.CalledProcessError as e:
+            print(f"Erro ao aplicar a Task '{task_tekton_name}': {e}")
+            print(f"Detalhes do erro: {e.stderr.decode()}")
+            exit(1)
+
+    # 2. Geração do Objeto Pipeline (generated_pipeline.yaml)
+    pipeline = {
+        'apiVersion': 'tekton.dev/v1',
+        'kind': 'Pipeline',
+        'metadata': {'name': PIPELINE_NAME, 'namespace': NAMESPACE},
+        'spec': {
+            'workspaces': [{'name': 'shared-workspace'}], # O Pipeline precisa de um workspace
+            'tasks': []
+        }
+    }
+
+    # Adiciona as Tasks geradas ao Pipeline usando taskRef
+    for task_info in generated_pipeline_tasks_info:
+        pipeline_task = {
+            'name': task_info['name'],
+            'taskRef': {
+                'name': task_info['name'] # Referencia a Task pelo nome gerado
+            },
+            'workspaces': [
+                {
+                    'name': 'shared-workspace', # O nome do workspace na Task (que é 'shared-workspace')
+                    'workspace': 'shared-workspace' # O nome do workspace no Pipeline (que é 'shared-workspace')
+                }
+            ]
+        }
+        if task_info.get('runAfter'):
+            pipeline_task['runAfter'] = task_info['runAfter']
+            
+        pipeline['spec']['tasks'].append(pipeline_task)
 
     # Salva o Pipeline gerado em um arquivo YAML
     with open(OUTPUT_PIPELINE, 'w') as f:
         yaml.dump(pipeline, f, sort_keys=False)
-
     print(f"Pipeline '{PIPELINE_NAME}' gerado em '{OUTPUT_PIPELINE}'")
 
     # Aplica o Pipeline no cluster Kubernetes
@@ -107,7 +143,7 @@ def main():
         print(f"Detalhes do erro: {e.stderr.decode()}")
         exit(1)
 
-    # --- 2. Geração do Objeto PipelineRun (generated_pipelinerun.yaml) ---
+    # 3. Geração do Objeto PipelineRun (generated_pipelinerun.yaml)
     pipelinerun = {
         'apiVersion': 'tekton.dev/v1',
         'kind': 'PipelineRun',
@@ -134,7 +170,6 @@ def main():
     # Salva o PipelineRun gerado em um arquivo YAML
     with open(OUTPUT_PIPELINERUN, 'w') as f:
         yaml.dump(pipelinerun, f, sort_keys=False)
-
     print(f"PipelineRun '{PIPELINERUN_NAME}' gerado em '{OUTPUT_PIPELINERUN}'")
 
     # Aplica o PipelineRun para disparar a execução da pipeline gerada
