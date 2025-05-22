@@ -32,8 +32,7 @@ def main():
         with open(CI_CONFIG_PATH) as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
-        print(f"Erro: O arquivo '{CI_CONFIG_PATH}' não foi encontrado. "
-              "Certifique-se de que ele existe no diretório do repositório clonado pelo meta-pipeline.")
+        print(f"Erro: O arquivo '{CI_CONFIG_PATH}' não foi encontrado.")
         exit(1)
 
     # Lista para armazenar os nomes das Tasks geradas para o Pipeline
@@ -51,42 +50,25 @@ def main():
             'kind': 'Task',
             'metadata': {'name': task_tekton_name, 'namespace': NAMESPACE},
             'spec': {
-                'workspaces': [{'name': 'shared-workspace'}], # Continua declarando o workspace
-                # --- INÍCIO DA CORREÇÃO: REMOVENDO O WORKAROUND DO 'volumes' AQUI ---
-                # A seção 'volumes' NÃO DEVE estar na definição da Task.
-                # O Tekton a adiciona automaticamente a partir do PipelineRun.
-                # 'volumes': [
-                #     {
-                #         'name': 'shared-workspace',
-                #         'persistentVolumeClaim': {
-                #             'claimName': 'shared-workspace-pvc'
-                #         }
-                #     }
-                # ],
-                # --- FIM DA CORREÇÃO ---
+                'workspaces': [{'name': 'shared-workspace'}],
                 'steps': []
             }
         }
 
         # Itera sobre os comandos dentro de cada passo para criar os Steps da Task
-        for command in step_config['commands']:
-            step_name = normalize_name(command)
-            
-            script_content = f"#!/bin/sh\n" \
-                             f"apt-get update && apt-get install -y make || echo 'make already installed or could not install'\n" \
-                             f"{command}"
-            
+        for idx, command in enumerate(step_config['commands']):
+            step_name = f"step-{idx+1}"
+
+            script_content = f"""#!/bin/sh
+apt-get update && apt-get install -y make || echo 'make already installed or could not install'
+{command}
+"""
+
             step_spec = {
-                'name': step_name,
+                'name': normalize_name(step_name),
                 'image': step_config['image'],
                 'script': script_content,
-                'volumeMounts': [
-                    {
-                        'name': 'shared-workspace', # Continua referenciando o nome do workspace
-                        'mountPath': '/workspace'
-                    }
-                ],
-                'workingDir': '/workspace'
+                'workingDir': '$(workspaces.shared-workspace.path)'
             }
 
             if 'environment' in step_config:
@@ -94,7 +76,7 @@ def main():
                 step_spec['env'] = env_vars
 
             task_tekton['spec']['steps'].append(step_spec)
-        
+
         task_output_path = os.path.join(GENERATED_TASKS_DIR, f"{task_tekton_name}-task.yaml")
         with open(task_output_path, 'w') as f:
             yaml.dump(task_tekton, f, sort_keys=False)
@@ -122,9 +104,7 @@ def main():
     for task_info in generated_pipeline_tasks_info:
         pipeline_task = {
             'name': task_info['name'],
-            'taskRef': {
-                'name': task_info['name']
-            },
+            'taskRef': {'name': task_info['name']},
             'workspaces': [
                 {
                     'name': 'shared-workspace',
@@ -134,7 +114,7 @@ def main():
         }
         if task_info.get('runAfter'):
             pipeline_task['runAfter'] = task_info['runAfter']
-            
+
         pipeline['spec']['tasks'].append(pipeline_task)
 
     with open(OUTPUT_PIPELINE, 'w') as f:
