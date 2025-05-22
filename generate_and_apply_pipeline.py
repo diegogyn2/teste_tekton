@@ -52,16 +52,18 @@ def main():
             'metadata': {'name': task_tekton_name, 'namespace': NAMESPACE},
             'spec': {
                 'workspaces': [{'name': 'shared-workspace'}], # Continua declarando o workspace
-                # --- INÍCIO DO WORKAROUND: Força a definição do volume na Task ---
-                'volumes': [
-                    {
-                        'name': 'shared-workspace', # O nome do volume deve ser igual ao nome do workspace
-                        'persistentVolumeClaim': {
-                            'claimName': 'shared-workspace-pvc' # Referencia o PVC diretamente aqui
-                        }
-                    }
-                ],
-                # --- FIM DO WORKAROUND ---
+                # --- INÍCIO DA CORREÇÃO: REMOVENDO O WORKAROUND DO 'volumes' AQUI ---
+                # A seção 'volumes' NÃO DEVE estar na definição da Task.
+                # O Tekton a adiciona automaticamente a partir do PipelineRun.
+                # 'volumes': [
+                #     {
+                #         'name': 'shared-workspace',
+                #         'persistentVolumeClaim': {
+                #             'claimName': 'shared-workspace-pvc'
+                #         }
+                #     }
+                # ],
+                # --- FIM DA CORREÇÃO ---
                 'steps': []
             }
         }
@@ -80,7 +82,7 @@ def main():
                 'script': script_content,
                 'volumeMounts': [
                     {
-                        'name': 'shared-workspace', # Continua referenciando o nome do volume
+                        'name': 'shared-workspace', # Continua referenciando o nome do workspace
                         'mountPath': '/workspace'
                     }
                 ],
