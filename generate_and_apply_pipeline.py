@@ -71,7 +71,7 @@ pipelinerun = {
             {
                 'name': 'shared-workspace',
                 'volumeClaimTemplate': {
-                    'metadata': {'name': 'shared-workspace'},
+                    'metadata': {'name': 'shared-workspace-pvc'},
                     'spec': {
                         'accessModes': ['ReadWriteOnce'],
                         'resources': {'requests': {'storage': '1Gi'}}
