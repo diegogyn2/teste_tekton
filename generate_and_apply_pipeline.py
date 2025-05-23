@@ -101,7 +101,7 @@ def main():
     pipeline = {
         'apiVersion': 'tekton.dev/v1',
         'kind': 'Pipeline',
-        'metadata': {'name': PIPELINE_NAME, 'namespace': NAMESPACE},
+        'metadata': {'generateName': PIPELINE_NAME + '-', 'namespace': NAMESPACE},
         'spec': {'workspaces': [{'name': 'shared-workspace'}], 'tasks': []}
     }
 
