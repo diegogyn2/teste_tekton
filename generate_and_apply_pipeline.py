@@ -24,9 +24,15 @@ def main():
     os.makedirs(GENERATED_TASKS_DIR, exist_ok=True)
 
     # Determina o tipo de evento: pull_request ou merge_request
-    event_type = os.getenv('EVENT_TYPE')
+    event_type = os.getenv('EVENT_TYPE')  # ALTERADO
     if not event_type:
         print("Erro: variável de ambiente 'EVENT_TYPE' não definida. Use 'pull_request' ou 'merge_request'.")
+        exit(1)
+    
+    # Determina o repositório
+    repository_name = os.getenv('REPOSITORY_NAME')  # ALTERADO
+    if not repository_name:
+        print("Erro: variável de ambiente 'REPOSITORY_NAME' não definida.")
         exit(1)
     
     try:
@@ -36,22 +42,19 @@ def main():
         print(f"Erro: O arquivo '{CI_CONFIG_PATH}' não foi encontrado.")
         exit(1)
 
-    # Seleção das tasks conforme o tipo de evento
-    if event_type == 'pull_request':
-        selected_steps = [step for step in config['task_steps'] if step['name'] == 'validate']
-    elif event_type == 'merge_request':
-        selected_steps = [step for step in config['task_steps'] if step['name'] in ('build', 'deploy')]
-    else:
-        print(f"Erro: Tipo de evento '{event_type}' não reconhecido.")
-        exit(1)
+    # Seleção das tasks conforme o tipo de evento e repositório - ALTERADO
+    selected_steps = []
+    for step in config['task_steps']:
+        if event_type in step.get('events', []) and repository_name in step.get('repositories', []):
+            selected_steps.append(step)
 
     if not selected_steps:
-        print(f"Nenhuma task configurada para o tipo de evento '{event_type}'.")
+        print(f"Nenhuma task configurada para o tipo de evento '{event_type}' e repositório '{repository_name}'.")
         exit(1)
 
     generated_pipeline_tasks_info = []
 
-    print(f"Gerando e aplicando Tasks para evento: '{event_type}'...")
+    print(f"Gerando e aplicando Tasks para evento: '{event_type}' e repositório: '{repository_name}'...")
 
     for step_config in selected_steps:
         task_tekton_name = normalize_name(step_config['name'])

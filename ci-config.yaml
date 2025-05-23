@@ -1,5 +1,11 @@
 task_steps:
   - name: validate
+    events:
+      - pull_request
+      - merge_request
+    repositories:
+      - qa
+      - main
     image: python:3.11.7-bookworm
     environment:
       PRD_TESTE: "PRD"
@@ -9,15 +15,43 @@ task_steps:
       - echo $PRD_TESTE
 
   - name: build
+    events:
+      - merge_request
+    repositories:
+      - qa
+      - main
     image: python:3.11.7-bookworm
     commands:
       - echo "Rodando build"
       - make print-teste
 
   - name: deploy
+    events:
+      - pull_request
+    repositories:
+      - qa
+      - main
     image: python:3.11.7-bookworm
     runAfter:
       - build
     commands:
       - echo "Deploy para prod"
       - make print-teste
+
+  - name: teste
+    events:
+      - pull_request
+    repositories:
+      - qa
+      - main
+    image: python:3.11.7-bookworm
+    environment:
+      PRD_TESTE: "PRD"
+      LOCAL_TESTE: "REPO"
+    runAfter:
+      - validate
+    commands:
+      - echo LOCAL_TESTE
+      - echo PRD_TESTE
+      - make print-teste
+
