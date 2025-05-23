@@ -1,12 +1,11 @@
-steps:
+task_steps:
   - name: validate
     image: python:3.11.7-bookworm
     environment:
       PRD_TESTE: "PRD"
       LOCAL_TESTE: "REPO"
     commands:
-      - ls -l $(workspaces.shared-workspace.path)
-      - cat $(workspaces.shared-workspace.path)/Makefile
+      - cd $(workspaces.shared-workspace.path)/repo
       - make print-teste
       - echo $PRD_TESTE
 
