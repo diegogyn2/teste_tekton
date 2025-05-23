@@ -5,7 +5,6 @@ task_steps:
       PRD_TESTE: "PRD"
       LOCAL_TESTE: "REPO"
     commands:
-      - cd $(workspaces.shared-workspace.path)/repo
       - make print-teste
       - echo $PRD_TESTE
 
