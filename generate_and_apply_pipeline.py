@@ -134,7 +134,7 @@ def main():
         'spec': {
             'pipelineRef': {'name': PIPELINE_NAME},
             'workspaces': [{'name': 'shared-workspace', 'persistentVolumeClaim': {'claimName': 'shared-workspace-pvc'}}],
-            'taskRunTemplate': {'serviceAccountName': 'trustme-tekton-triggers-sa'}
+            'serviceAccountName': 'trustme-tekton-triggers-sa'  # <-- corrigido aqui
         }
     }
 
