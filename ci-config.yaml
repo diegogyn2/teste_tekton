@@ -3,7 +3,7 @@ task_steps:
     events:
       - pull_request
       - merge_request
-    branch:
+    branches:
       - qa
       - main
     image: python:3.11.7-bookworm
@@ -17,7 +17,7 @@ task_steps:
   - name: build
     events:
       - merge_request
-    branch:
+    branches:
       - qa
       - main
     image: python:3.11.7-bookworm
@@ -28,7 +28,7 @@ task_steps:
   - name: deploy
     events:
       - pull_request
-    repositories:
+    branches:
       - qa
       - main
     image: python:3.11.7-bookworm
@@ -41,7 +41,7 @@ task_steps:
   - name: teste
     events:
       - pull_request
-    branch:
+    branches:
       - qa
       - main
     image: python:3.11.7-bookworm
@@ -54,4 +54,3 @@ task_steps:
       - echo LOCAL_TESTE
       - echo PRD_TESTE
       - make print-teste
-
