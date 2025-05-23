@@ -15,26 +15,28 @@ NAMESPACE = 'ci-cd-trustme'
 GENERATED_TASKS_DIR = 'generated-tasks'
 
 def normalize_name(s):
+    """Normaliza nomes para padrão Kubernetes: letras minúsculas, números e hífen, até 63 caracteres"""
     name = s.lower()
     name = re.sub(r'[^a-z0-9-]+', '-', name)
     name = re.sub(r'-+', '-', name)
     return name.strip('-')[:63]
 
 def main():
+    # Cria pasta para armazenar tasks geradas
     os.makedirs(GENERATED_TASKS_DIR, exist_ok=True)
 
-    # Determina o tipo de evento: pull_request ou merge_request
-    event_type = os.getenv('EVENT_TYPE')  # ALTERADO
+    # Captura variáveis de ambiente
+    event_type = os.getenv('EVENT_TYPE')
     if not event_type:
         print("Erro: variável de ambiente 'EVENT_TYPE' não definida. Use 'pull_request' ou 'merge_request'.")
         exit(1)
-    
-    # Determina o repositório
-    repository_name = os.getenv('REPOSITORY_NAME')  # ALTERADO
+
+    repository_name = os.getenv('REPOSITORY_NAME')
     if not repository_name:
         print("Erro: variável de ambiente 'REPOSITORY_NAME' não definida.")
         exit(1)
-    
+
+    # Carrega configuração YAML
     try:
         with open(CI_CONFIG_PATH) as f:
             config = yaml.safe_load(f)
@@ -42,9 +44,9 @@ def main():
         print(f"Erro: O arquivo '{CI_CONFIG_PATH}' não foi encontrado.")
         exit(1)
 
-    # Seleção das tasks conforme o tipo de evento e repositório - ALTERADO
+    # Filtra as tasks que devem rodar para o evento e repositório atuais
     selected_steps = []
-    for step in config['task_steps']:
+    for step in config.get('task_steps', []):
         if event_type in step.get('events', []) and repository_name in step.get('repositories', []):
             selected_steps.append(step)
 
@@ -58,22 +60,22 @@ def main():
 
     for step_config in selected_steps:
         task_tekton_name = normalize_name(step_config['name'])
+
+        run_after = step_config.get('runAfter')
+        # Garante que runAfter seja lista, se presente
+        if run_after and not isinstance(run_after, list):
+            run_after = [run_after]
+
         generated_pipeline_tasks_info.append({
             'name': task_tekton_name,
-            'runAfter': step_config.get('runAfter')
+            'runAfter': run_after
         })
 
-        task_tekton = {
-            'apiVersion': 'tekton.dev/v1',
-            'kind': 'Task',
-            'metadata': {'name': task_tekton_name, 'namespace': NAMESPACE},
-            'spec': {'workspaces': [{'name': 'shared-workspace'}], 'steps': []}
-        }
-
+        # Monta o script shell da Task
         script_lines = [
             "#!/bin/sh",
-            "apt-get update && apt-get install -y make || echo 'make already installed or could not install'"
-        ] + step_config['commands']
+            "apt-get update && apt-get install -y make || echo 'make já instalado ou falha na instalação'"
+        ] + step_config.get('commands', [])
 
         step_spec = {
             'name': normalize_name(step_config['name']),
@@ -86,14 +88,27 @@ def main():
             env_vars = [{'name': k, 'value': v} for k, v in step_config['environment'].items()]
             step_spec['env'] = env_vars
 
-        task_tekton['spec']['steps'].append(step_spec)
+        task_tekton = {
+            'apiVersion': 'tekton.dev/v1',
+            'kind': 'Task',
+            'metadata': {
+                'name': task_tekton_name,
+                'namespace': NAMESPACE
+            },
+            'spec': {
+                'workspaces': [{'name': 'shared-workspace'}],
+                'steps': [step_spec]
+            }
+        }
 
+        # Salva Task em arquivo YAML
         task_output_path = os.path.join(GENERATED_TASKS_DIR, f"{task_tekton_name}-task.yaml")
         with open(task_output_path, 'w') as f:
             yaml.dump(task_tekton, f, sort_keys=False)
-        
+
         print(f"Task '{task_tekton_name}' gerada em '{task_output_path}'")
 
+        # Aplica Task no cluster Kubernetes
         try:
             subprocess.run(['kubectl', 'apply', '-f', task_output_path], check=True, capture_output=True)
             print(f"Task '{task_tekton_name}' aplicada com sucesso.")
@@ -101,17 +116,23 @@ def main():
             print(f"Erro ao aplicar a Task '{task_tekton_name}': {e.stderr.decode()}")
             exit(1)
 
-    # Geração de nomes aleatórios
+    # Cria nomes únicos para Pipeline e PipelineRun
     random_suffix = str(uuid.uuid4())[:8]
     generated_pipeline_name = f"{PIPELINE_NAME}-{random_suffix}"
     generated_pipelinerun_name = f"{PIPELINERUN_NAME}-{random_suffix}"
 
-    # Geração do Pipeline
+    # Monta Pipeline com as Tasks geradas
     pipeline = {
         'apiVersion': 'tekton.dev/v1',
         'kind': 'Pipeline',
-        'metadata': {'name': generated_pipeline_name, 'namespace': NAMESPACE},
-        'spec': {'workspaces': [{'name': 'shared-workspace'}], 'tasks': []}
+        'metadata': {
+            'name': generated_pipeline_name,
+            'namespace': NAMESPACE
+        },
+        'spec': {
+            'workspaces': [{'name': 'shared-workspace'}],
+            'tasks': []
+        }
     }
 
     for task_info in generated_pipeline_tasks_info:
@@ -135,15 +156,23 @@ def main():
         print(f"Erro ao aplicar o Pipeline: {e.stderr.decode()}")
         exit(1)
 
-    # Geração do PipelineRun
+    # Monta PipelineRun para executar o Pipeline
     pipelinerun = {
         'apiVersion': 'tekton.dev/v1',
         'kind': 'PipelineRun',
-        'metadata': {'name': generated_pipelinerun_name, 'namespace': NAMESPACE},
+        'metadata': {
+            'name': generated_pipelinerun_name,
+            'namespace': NAMESPACE
+        },
         'spec': {
             'pipelineRef': {'name': generated_pipeline_name},
-            'workspaces': [{'name': 'shared-workspace', 'persistentVolumeClaim': {'claimName': 'shared-workspace-pvc'}}],
-            'taskRunTemplate': {'serviceAccountName': 'trustme-tekton-triggers-sa'}
+            'workspaces': [{
+                'name': 'shared-workspace',
+                'persistentVolumeClaim': {'claimName': 'shared-workspace-pvc'}
+            }],
+            'taskRunTemplate': {
+                'serviceAccountName': 'trustme-tekton-triggers-sa'
+            }
         }
     }
 
