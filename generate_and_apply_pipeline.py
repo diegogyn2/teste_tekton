@@ -44,34 +44,37 @@ def main():
         task_tekton_name = normalize_name(step_config['name'])
         generated_pipeline_tasks_info.append({'name': task_tekton_name, 'runAfter': step_config.get('runAfter')})
 
-        # Concatena todos os comandos em um único script
-        all_commands = '\n'.join(step_config['commands'])
-        script_content = f"""#!/bin/sh
-apt-get update && apt-get install -y make || echo 'make already installed or could not install'
-{all_commands}
-"""
-
-        # Define o único step para a Task Tekton
-        step_spec = {
-            'name': task_tekton_name,
-            'image': step_config['image'],
-            'script': script_content,
-            'workingDir': '$(workspaces.shared-workspace.path)'
-        }
-
-        if 'environment' in step_config:
-            env_vars = [{'name': k, 'value': v} for k, v in step_config['environment'].items()]
-            step_spec['env'] = env_vars
-
+        # Define a estrutura da Task Tekton
         task_tekton = {
             'apiVersion': 'tekton.dev/v1',
             'kind': 'Task',
             'metadata': {'name': task_tekton_name, 'namespace': NAMESPACE},
             'spec': {
                 'workspaces': [{'name': 'shared-workspace'}],
-                'steps': [step_spec]  # Apenas um step por task
+                'steps': []
             }
         }
+
+        # Cria um único step com o nome igual ao name do bloco
+        script_lines = [
+            "#!/bin/sh",
+            "apt-get update && apt-get install -y make || echo 'make already installed or could not install'"
+        ] + step_config['commands']
+
+        script_content = "\n".join(script_lines)
+
+        step_spec = {
+            'name': normalize_name(step_config['name']),
+            'image': step_config['image'],
+            'script': script_content,
+            'workingDir': '$(workspaces.shared-workspace.path)/repo'
+        }
+
+        if 'environment' in step_config:
+            env_vars = [{'name': k, 'value': v} for k, v in step_config['environment'].items()]
+            step_spec['env'] = env_vars
+
+        task_tekton['spec']['steps'].append(step_spec)
 
         task_output_path = os.path.join(GENERATED_TASKS_DIR, f"{task_tekton_name}-task.yaml")
         with open(task_output_path, 'w') as f:
