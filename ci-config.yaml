@@ -3,7 +3,7 @@ task_steps:
     events:
       - pull_request
       - merge_request
-    repositories:
+    branch:
       - qa
       - main
     image: python:3.11.7-bookworm
@@ -17,7 +17,7 @@ task_steps:
   - name: build
     events:
       - merge_request
-    repositories:
+    branch:
       - qa
       - main
     image: python:3.11.7-bookworm
@@ -41,7 +41,7 @@ task_steps:
   - name: teste
     events:
       - pull_request
-    repositories:
+    branch:
       - qa
       - main
     image: python:3.11.7-bookworm
