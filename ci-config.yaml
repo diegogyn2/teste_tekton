@@ -10,8 +10,6 @@ task_steps:
 
   - name: build
     image: python:3.11.7-bookworm
-    runAfter:
-      - validate
     commands:
       - echo "Rodando build"
       - make print-teste
