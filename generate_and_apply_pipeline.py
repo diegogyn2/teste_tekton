@@ -3,6 +3,7 @@ import subprocess
 import re
 import os
 import sys
+import uuid
 
 # Constantes
 CI_CONFIG_PATH = 'ci-config.yaml'
@@ -97,11 +98,16 @@ def main():
             print(f"Erro ao aplicar a Task '{task_tekton_name}': {e.stderr.decode()}")
             exit(1)
 
+    # Geração de nomes aleatórios
+    random_suffix = str(uuid.uuid4())[:8]
+    generated_pipeline_name = f"{PIPELINE_NAME}-{random_suffix}"
+    generated_pipelinerun_name = f"{PIPELINERUN_NAME}-{random_suffix}"
+
     # Geração do Pipeline
     pipeline = {
         'apiVersion': 'tekton.dev/v1',
         'kind': 'Pipeline',
-        'metadata': {'generateName': PIPELINE_NAME + '-', 'namespace': NAMESPACE},
+        'metadata': {'name': generated_pipeline_name, 'namespace': NAMESPACE},
         'spec': {'workspaces': [{'name': 'shared-workspace'}], 'tasks': []}
     }
 
@@ -117,11 +123,11 @@ def main():
 
     with open(OUTPUT_PIPELINE, 'w') as f:
         yaml.dump(pipeline, f, sort_keys=False)
-    print(f"Pipeline '{PIPELINE_NAME}' gerado em '{OUTPUT_PIPELINE}'")
+    print(f"Pipeline '{generated_pipeline_name}' gerado em '{OUTPUT_PIPELINE}'")
 
     try:
         subprocess.run(['kubectl', 'apply', '-f', OUTPUT_PIPELINE], check=True, capture_output=True)
-        print(f"Pipeline '{PIPELINE_NAME}' aplicado com sucesso.")
+        print(f"Pipeline '{generated_pipeline_name}' aplicado com sucesso.")
     except subprocess.CalledProcessError as e:
         print(f"Erro ao aplicar o Pipeline: {e.stderr.decode()}")
         exit(1)
@@ -130,9 +136,9 @@ def main():
     pipelinerun = {
         'apiVersion': 'tekton.dev/v1',
         'kind': 'PipelineRun',
-        'metadata': {'name': PIPELINERUN_NAME, 'namespace': NAMESPACE},
+        'metadata': {'name': generated_pipelinerun_name, 'namespace': NAMESPACE},
         'spec': {
-            'pipelineRef': {'name': PIPELINE_NAME},
+            'pipelineRef': {'name': generated_pipeline_name},
             'workspaces': [{'name': 'shared-workspace', 'persistentVolumeClaim': {'claimName': 'shared-workspace-pvc'}}],
             'taskRunTemplate': {'serviceAccountName': 'trustme-tekton-triggers-sa'}
         }
@@ -140,11 +146,11 @@ def main():
 
     with open(OUTPUT_PIPELINERUN, 'w') as f:
         yaml.dump(pipelinerun, f, sort_keys=False)
-    print(f"PipelineRun '{PIPELINERUN_NAME}' gerado em '{OUTPUT_PIPELINERUN}'")
+    print(f"PipelineRun '{generated_pipelinerun_name}' gerado em '{OUTPUT_PIPELINERUN}'")
 
     try:
         subprocess.run(['kubectl', 'apply', '-f', OUTPUT_PIPELINERUN], check=True, capture_output=True)
-        print(f"PipelineRun '{PIPELINERUN_NAME}' aplicado e executado com sucesso.")
+        print(f"PipelineRun '{generated_pipelinerun_name}' aplicado e executado com sucesso.")
     except subprocess.CalledProcessError as e:
         print(f"Erro ao aplicar o PipelineRun: {e.stderr.decode()}")
         exit(1)
