@@ -28,9 +28,9 @@ def main():
         exit(1)
     
     if event_type in ['opened', 'reopened', 'synchronize']:
-        event_type == 'pull_request'
+        event_type = 'pull_request'
     elif event_type == 'closed' and merged.upper() == "TRUE":
-        event_type == 'merge_request'
+        event_type = 'merge_request'
     
    
 
