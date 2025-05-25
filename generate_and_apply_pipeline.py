@@ -52,7 +52,7 @@ def main():
         exit(1)
 
     selected_steps = []
-    for step in config.get('task_steps', []):
+    for step in config.get('pipeline_steps', []):
         if event_type in step.get('events', []):
             # Filtra por branch, removendo refs/heads/ do nome da branch se existir
             branch_name = branch.replace('refs/heads/', '')
