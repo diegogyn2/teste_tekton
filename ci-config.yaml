@@ -1,4 +1,5 @@
-task_steps:
+apiVersion: pipe.seg.dev/v1
+pipeline_steps:
   - name: validate
     events:
       - pull_request
