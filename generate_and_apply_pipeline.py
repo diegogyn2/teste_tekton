@@ -21,11 +21,18 @@ def normalize_name(s):
 
 def main():
     os.makedirs(GENERATED_TASKS_DIR, exist_ok=True)
-
+    merged = os.getenv('PR_MERGED')
     event_type = os.getenv('EVENT_TYPE')
     if not event_type:
         print("Erro: variável de ambiente 'EVENT_TYPE' não definida. Use 'pull_request' ou 'merge_request'.")
         exit(1)
+    
+    if event_type in ['opened', 'reopened', 'synchronize']:
+        event_type == 'pull_request'
+    elif event_type == 'closed' and merged == True:
+        event_type == 'merge_request'
+    
+   
 
     repository_name = os.getenv('REPOSITORY_NAME')
     if not repository_name:
