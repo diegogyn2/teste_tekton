@@ -27,7 +27,7 @@ task_steps:
 
   - name: deploy
     events:
-      - pull_request
+      - merge_request
     branches:
       - qa
       - main
