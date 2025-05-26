@@ -1,7 +1,7 @@
 apiVersion: pipe.seg.dev/v1
 pipeline_steps:
   - name: validate
-    events:
+    trigger_events:
       - pull_request
       - merge_request
     branches:
@@ -17,7 +17,7 @@ pipeline_steps:
       - echo $PRD_TESTE
 
   - name: build
-    events:
+    trigger_events:
       - merge_request
     branches:
       - qa
@@ -28,7 +28,7 @@ pipeline_steps:
       - make print-teste
 
   - name: deploy
-    events:
+    trigger_events:
       - merge_request
     branches:
       - qa
@@ -41,7 +41,7 @@ pipeline_steps:
       - make print-teste
 
   - name: teste
-    events:
+    trigger_events:
       - pull_request
     branches:
       - qa
