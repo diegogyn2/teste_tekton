@@ -12,8 +12,19 @@ pipeline_steps:
       PRD_TESTE: "PRD"
       LOCAL_TESTE: "REPO"
     commands:
-      - python3 -m pip install -r ./requirements/requirements_install.txt
-      - make print-teste
+      - echo "--- Início da Depuração da Task 'validate' ---"
+      - echo "ID do Usuário: $(id -u)" # Qual usuário está executando?
+      - echo "Grupo do Usuário: $(id -g)" # Qual grupo está executando?
+      - echo "Diretório de Trabalho Atual (pwd):"
+      - pwd
+      - echo "Conteúdo do Diretório de Trabalho Atual (ls -la .):"
+      - ls -la . # Lista o conteúdo do diretório atual
+      - echo "Conteúdo do Diretório 'requirements':"
+      - ls -la ./requirements/ # Verifica se 'requirements' existe e o que tem dentro
+      - echo "Caminho completo do make: $(which make)" # Onde o make está localizado
+      - echo "--- Fim da Depuração da Task 'validate' ---"
+      - python3 -m pip install -r ./requirements/requirements_install.txt # <- Linha que falha
+      - make print-teste # <- Linha que falha
       - echo $PRD_TESTE
       - echo $CHANGED_FILES_LIST
 
