@@ -1,2 +1,2 @@
 print-teste:
-	python3 ./teste.py
+	python3 ./src/teste.py
