@@ -12,6 +12,7 @@ pipeline_steps:
       PRD_TESTE: "PRD"
       LOCAL_TESTE: "REPO"
     commands:
+      - ls -la
       - python3 -m pip install -r ./requirements/requirements_install.txt
       - make print-teste
       - echo $PRD_TESTE
