@@ -13,15 +13,15 @@ pipeline_steps:
       LOCAL_TESTE: "REPO"
     commands:
       - echo "--- Início da Depuração da Task 'validate' ---"
-      - echo "ID do Usuário: $(id -u)" # Qual usuário está executando?
-      - echo "Grupo do Usuário: $(id -g)" # Qual grupo está executando?
+      - echo "ID do Usuário -> $(id -u)"
+      - echo "Grupo do Usuário -> $(id -g)"
       - echo "Diretório de Trabalho Atual (pwd):"
       - pwd
       - echo "Conteúdo do Diretório de Trabalho Atual (ls -la .):"
       - ls -la .
       - echo "Conteúdo do Diretório 'requirements':"
       - ls -la ./requirements/
-      - echo "Caminho completo do make: $(which make)" # Onde o make está localizado
+      - echo "Caminho completo do make -> $(which make)" # Onde o make está localizado
       - echo "--- Fim da Depuração da Task 'validate' ---"
       - python3 -m pip install -r ./requirements/requirements_install.txt
       - make print-teste
