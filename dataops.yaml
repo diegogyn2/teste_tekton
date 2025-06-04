@@ -12,7 +12,20 @@ pipeline_steps:
       PRD_TESTE: "PRD"
       LOCAL_TESTE: "REPO"
     commands:
-      - ls -la
+      # --- COMANDOS DE DEPURACAO (NOVOS OU ALTERADOS) ---
+      - echo "--- Conteúdo do Working Directory atual (.):"
+      - ls -la .
+      - echo "--- df -h (uso do disco e montagens):"
+      - df -h
+      - echo "--- mount (todos os pontos de montagem):"
+      - mount
+      - echo "--- Conteúdo da raiz do workspace /workspace/source-code:"
+      - ls -la /workspace/source-code
+      - echo "--- Conteúdo do subdiretório clonado /workspace/source-code/$(params.repo-name):"
+      - ls -la /workspace/source-code/$(params.repo-name)
+      - echo "--- Diretório de trabalho atual (pwd):"
+      - pwd
+      # --- FIM DOS COMANDOS DE DEPURACAO ---
       - python3 -m pip install -r ./requirements/requirements_install.txt
       - make print-teste
       - echo $PRD_TESTE
@@ -55,7 +68,20 @@ pipeline_steps:
     runAfter:
       - validate
     commands:
-      - ls -la
+      # --- COMANDOS DE DEPURACAO (NOVOS OU ALTERADOS) ---
+      - echo "--- Conteúdo do Working Directory atual (.):"
+      - ls -la .
+      - echo "--- df -h (uso do disco e montagens):"
+      - df -h
+      - echo "--- mount (todos os pontos de montagem):"
+      - mount
+      - echo "--- Conteúdo da raiz do workspace /workspace/source-code:"
+      - ls -la /workspace/source-code
+      - echo "--- Conteúdo do subdiretório clonado /workspace/source-code/$(params.repo-name):"
+      - ls -la /workspace/source-code/$(params.repo-name)
+      - echo "--- Diretório de trabalho atual (pwd):"
+      - pwd
+      # --- FIM DOS COMANDOS DE DEPURACAO ---
       - echo LOCAL_TESTE
       - echo PRD_TESTE
       - make print-teste
