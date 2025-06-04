@@ -15,6 +15,7 @@ pipeline_steps:
       - python3 -m pip install -r ./requirements/requirements_install.txt
       - make print-teste
       - echo $PRD_TESTE
+      - echo $CHANGED_FILES_LIST
 
   - name: build
     trigger_events:
@@ -53,6 +54,7 @@ pipeline_steps:
     runAfter:
       - validate
     commands:
+      - ls -la
       - echo LOCAL_TESTE
       - echo PRD_TESTE
       - make print-teste
